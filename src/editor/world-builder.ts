@@ -20,5 +20,7 @@ export class WorldBuilder {
 
     root.replaceChildren(layout.element)
     minimap.connect(mapArea.mapGrid)
+
+    void mapArea.initialize()
   }
 }

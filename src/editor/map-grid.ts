@@ -106,6 +106,7 @@ export class MapGrid implements MapViewport {
   readonly element: SVGSVGElement
 
   private readonly polygons = new Map<string, SVGPolygonElement>()
+  private readonly coordinates: Coordinate[]
   private readonly world: MapFrame
   private readonly viewListeners: Array<(view: MapView) => void> = []
 
@@ -123,6 +124,12 @@ export class MapGrid implements MapViewport {
       skeletonWidth: SKELETON_WIDTH,
       skeletonHeight: SKELETON_HEIGHT,
     })
+
+    this.coordinates = hexagons.map((hexagon) => ({
+      x: hexagon.coordinate.x,
+      y: hexagon.coordinate.y,
+    }))
+
     const bounds = grid.getGridBounds(
       hexagons.map((hexagon) => hexagon.coordinate),
       HEX_WORLD_WIDTH,
@@ -173,6 +180,10 @@ export class MapGrid implements MapViewport {
     }).observe(canvas)
   }
 
+  getCoordinates(): Coordinate[] {
+    return this.coordinates.map((coordinate) => ({ ...coordinate }))
+  }
+
   getWorldFrame(): MapFrame {
     return frameOf(this.world)
   }
@@ -203,6 +214,7 @@ export class MapGrid implements MapViewport {
         `No hexagon is rendered at coordinate (${coordinate.x}, ${coordinate.y}).`,
       )
     }
+
     polygon.setAttribute('fill', fill)
   }
 
@@ -212,7 +224,12 @@ export class MapGrid implements MapViewport {
     this.viewportHeight = viewport.height
 
     const fitted = this.fittedViewSize()
-    const center = this.clampCenter(this.centerX, this.centerY, fitted.width, fitted.height)
+    const center = this.clampCenter(
+      this.centerX,
+      this.centerY,
+      fitted.width,
+      fitted.height,
+    )
     this.centerX = center.x
     this.centerY = center.y
 
