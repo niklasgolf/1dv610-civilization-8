@@ -1,4 +1,3 @@
-import { worldMapPlaceholder } from './map-grid.ts'
 import { appendSvg, createSvg } from './svg.ts'
 
 export class Minimap {
@@ -69,7 +68,7 @@ function createMinimapPlaceholder(): SVGSVGElement {
     'font-family': 'Avenir Next, Segoe UI, sans-serif',
     'letter-spacing': '0.12em',
   })
-  label.textContent = `${worldMapPlaceholder.skeletonWidth} × ${worldMapPlaceholder.skeletonHeight}`
+  label.textContent = '42 × 13'
 
   return canvas
 }

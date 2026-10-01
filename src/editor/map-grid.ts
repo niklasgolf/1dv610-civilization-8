@@ -1,66 +1,84 @@
+import { HexGrid, type Coordinate } from 'midgard-hex-grid'
+
 import { appendSvg, createSvg } from './svg.ts'
 
+const SKELETON_WIDTH = 42
+const SKELETON_HEIGHT = 13
+
 /**
- * Intended future grid. The real hex library is not connected yet.
- * These values are only used as a label, not to calculate a grid.
+ * Full width of one hexagon in the library geometry.
+ * An x-dominated grid treats hexDiameter as that width.
+ * The SVG viewBox scales this geometry to the map area.
  */
-export const worldMapPlaceholder = {
-  orientation: 'x-dominated',
-  skeletonWidth: 42,
-  skeletonHeight: 13,
-} as const
+const HEX_WIDTH = 32
 
-const PLACEHOLDER_LABEL = `${worldMapPlaceholder.skeletonWidth} × ${worldMapPlaceholder.skeletonHeight} World Map`
+const VIEW_PADDING = 12
 
-export function createMapPlaceholder(): SVGSVGElement {
-  const canvas = createSvg('svg', {
-    class: 'map-area__grid',
-    viewBox: '0 0 1200 720',
-    preserveAspectRatio: 'xMidYMid meet',
-    role: 'img',
-    'aria-label': `${PLACEHOLDER_LABEL}, ${worldMapPlaceholder.orientation}`,
-  })
+const HEX_FILL = '#0e4664'
+const HEX_STROKE = '#3d8eab'
 
-  appendSvg(canvas, 'rect', {
-    x: '36',
-    y: '28',
-    width: '1128',
-    height: '664',
-    rx: '10',
-    fill: 'rgba(14, 58, 78, 0.35)',
-    stroke: '#a68445',
-    'stroke-width': '2',
-  })
+function coordinateKey(coordinate: Coordinate): string {
+  return `${coordinate.x}-${coordinate.y}`
+}
 
-  appendSvg(canvas, 'path', {
-    d: 'M600 168 820 292 V516 L600 640 380 516 V292 Z',
-    fill: 'rgba(27, 106, 134, 0.72)',
-    stroke: '#e2c27a',
-    'stroke-width': '2',
-    'stroke-linejoin': 'round',
-  })
+export class MapGrid {
+  readonly element: SVGSVGElement
 
-  const title = appendSvg(canvas, 'text', {
-    x: '600',
-    y: '392',
-    'text-anchor': 'middle',
-    fill: '#f3ead7',
-    'font-size': '28',
-    'font-family': 'Avenir Next, Segoe UI, sans-serif',
-    'letter-spacing': '0.14em',
-  })
-  title.textContent = PLACEHOLDER_LABEL
+  private readonly polygons = new Map<string, SVGPolygonElement>()
 
-  const detail = appendSvg(canvas, 'text', {
-    x: '600',
-    y: '428',
-    'text-anchor': 'middle',
-    fill: '#e2c27a',
-    'font-size': '16',
-    'font-family': 'Avenir Next, Segoe UI, sans-serif',
-    'letter-spacing': '0.18em',
-  })
-  detail.textContent = worldMapPlaceholder.orientation
+  constructor() {
+    const grid = new HexGrid('x-dominated')
+    const hexagons = grid.createGrid({
+      hexDiameter: HEX_WIDTH,
+      skeletonWidth: SKELETON_WIDTH,
+      skeletonHeight: SKELETON_HEIGHT,
+    })
+    const bounds = grid.getGridBounds(
+      hexagons.map((hexagon) => hexagon.coordinate),
+      HEX_WIDTH,
+    )
 
-  return canvas
+    const canvas = createSvg('svg', {
+      class: 'map-area__grid',
+      viewBox: [
+        bounds.minX - VIEW_PADDING,
+        bounds.minY - VIEW_PADDING,
+        bounds.width + VIEW_PADDING * 2,
+        bounds.height + VIEW_PADDING * 2,
+      ].join(' '),
+      preserveAspectRatio: 'xMidYMid meet',
+      role: 'img',
+      'aria-label': 'Hexagonal world map',
+    })
+
+    for (const hexagon of hexagons) {
+      const key = coordinateKey(hexagon.coordinate)
+      const polygon = appendSvg(canvas, 'polygon', {
+        id: `hex-${key}`,
+        'data-x': String(hexagon.coordinate.x),
+        'data-y': String(hexagon.coordinate.y),
+        points: hexagon.points
+          .map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`)
+          .join(' '),
+        fill: HEX_FILL,
+        stroke: HEX_STROKE,
+        'stroke-width': '1',
+        'stroke-linejoin': 'round',
+        'vector-effect': 'non-scaling-stroke',
+      })
+      this.polygons.set(key, polygon)
+    }
+
+    this.element = canvas
+  }
+
+  setHexFill(coordinate: Coordinate, fill: string): void {
+    const polygon = this.polygons.get(coordinateKey(coordinate))
+    if (!polygon) {
+      throw new Error(
+        `No hexagon is rendered at coordinate (${coordinate.x}, ${coordinate.y}).`,
+      )
+    }
+    polygon.setAttribute('fill', fill)
+  }
 }
