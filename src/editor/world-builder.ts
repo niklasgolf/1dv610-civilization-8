@@ -8,14 +8,17 @@ import { ToolPanel } from './tool-panel.ts'
 export class WorldBuilder {
   constructor(root: HTMLElement) {
     const layout = new EditorLayout()
+    const mapArea = new MapArea()
+    const minimap = new Minimap(mapArea.mapGrid.getWorldFrame())
 
     layout.mount(
       new Header().element,
       new ToolPanel(leftTools, 'left').element,
-      new MapArea().element,
-      new ToolPanel(rightTools, 'right', new Minimap().element).element,
+      mapArea.element,
+      new ToolPanel(rightTools, 'right', minimap.element).element,
     )
 
     root.replaceChildren(layout.element)
+    minimap.connect(mapArea.mapGrid)
   }
 }
