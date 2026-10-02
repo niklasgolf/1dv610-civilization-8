@@ -1,4 +1,4 @@
-import { appendSvg, createSvg } from './svg.ts'
+import { appendSvg, createSvg } from '../graphics/primitives/svg.ts'
 
 export class Header {
   readonly element: HTMLElement
@@ -25,6 +25,7 @@ export class Header {
 
     title.append(name, dash, mode)
     header.append(createMark(), title)
+
     this.element = header
   }
 }
@@ -35,6 +36,7 @@ function createMark(): SVGSVGElement {
     viewBox: '0 0 24 24',
     'aria-hidden': 'true',
   })
+
   appendSvg(mark, 'path', {
     d: 'M12 2.2 20.4 7.1 20.4 16.9 12 21.8 3.6 16.9 3.6 7.1Z',
     fill: '#1b6a86',
@@ -42,5 +44,6 @@ function createMark(): SVGSVGElement {
     'stroke-width': '1.4',
     'stroke-linejoin': 'round',
   })
+
   return mark
 }

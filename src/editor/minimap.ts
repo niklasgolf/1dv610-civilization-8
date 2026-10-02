@@ -5,7 +5,7 @@ import {
   type MapViewport,
   type ZoomLevel,
 } from './map-grid.ts'
-import { appendSvg, createSvg } from './svg.ts'
+import { appendSvg, createSvg } from '../graphics/primitives/svg.ts'
 
 export class Minimap {
   readonly element: HTMLElement
@@ -58,12 +58,15 @@ export class Minimap {
       button.textContent = String(level)
       button.setAttribute('aria-label', `Zoom ${level}`)
       button.setAttribute('aria-pressed', level === 1 ? 'true' : 'false')
+
       if (level === 1) {
         button.classList.add('is-selected')
       }
+
       button.addEventListener('click', () => {
         this.zoomListener?.(level)
       })
+
       this.zoomButtons.set(level, button)
       levels.append(button)
     }
@@ -103,11 +106,13 @@ export class Minimap {
     this.svg.addEventListener('click', (event) => {
       const point = clientToSvg(this.svg, event.clientX, event.clientY)
       if (!point) return
+
       this.centerListener?.(point.x, point.y)
     })
 
     frame.append(this.svg)
     section.append(heading, zoom, frame)
+
     this.element = section
   }
 
@@ -115,12 +120,15 @@ export class Minimap {
     this.zoomListener = (level) => {
       map.setZoomLevel(level)
     }
+
     this.centerListener = (x, y) => {
       map.centerOn(x, y)
     }
+
     map.onViewChange((view) => {
       this.showView(view)
     })
+
     this.showView(map.getView())
   }
 
@@ -149,6 +157,11 @@ function clientToSvg(
   const point = svg.createSVGPoint()
   point.x = clientX
   point.y = clientY
+
   const world = point.matrixTransform(matrix.inverse())
-  return { x: world.x, y: world.y }
+
+  return {
+    x: world.x,
+    y: world.y,
+  }
 }

@@ -1,24 +1,13 @@
 import { HexGrid, type Coordinate } from 'midgard-hex-grid'
 
-import { appendSvg, createSvg } from './svg.ts'
+import {
+  HEX_BOUNDS,
+  HEX_WORLD_WIDTH,
+} from '../graphics/definitions/hex.ts'
+import { appendSvg, createSvg } from '../graphics/primitives/svg.ts'
 
 const SKELETON_WIDTH = 42
 const SKELETON_HEIGHT = 13
-
-/**
- * Canonical width of one x-dominated hex, in world units.
- *
- * Civilization 8 designs map graphics against this scale.
- * The library turns a 260-unit width into a hex of about
- * 260 × 300.22 world units. Future SVG artwork — forests,
- * mountains, resources, improvements, wonders — is drawn
- * in that coordinate space.
- *
- * 260 is a world/SVG size, not a screen-pixel size.
- * The camera viewBox decides how much of the world is visible.
- * The library remains the source of the resulting geometry.
- */
-const HEX_WORLD_WIDTH = 260
 
 /**
  * Margin around the complete world, in world units.
@@ -61,6 +50,11 @@ export interface MapViewport {
   onViewChange(listener: (view: MapView) => void): void
 }
 
+type HexPlacement = {
+  x: number
+  y: number
+}
+
 function coordinateKey(coordinate: Coordinate): string {
   return `${coordinate.x}-${coordinate.y}`
 }
@@ -76,8 +70,10 @@ function clampAxis(
   viewSpan: number,
 ): number {
   if (viewSpan >= span) return origin + span / 2
+
   const min = origin + viewSpan / 2
   const max = origin + span - viewSpan / 2
+
   return clamp(center, min, max)
 }
 
@@ -88,6 +84,7 @@ function clampAxis(
  */
 function zoomScales(fitScale: number): readonly number[] {
   const ratio = Math.pow(1 / fitScale, 1 / ZOOM_STEP_COUNT)
+
   return ZOOM_LEVELS.map((level) =>
     level === ZOOM_LEVELS.length ? 1 : fitScale * ratio ** (level - 1),
   )
@@ -106,6 +103,7 @@ export class MapGrid implements MapViewport {
   readonly element: SVGSVGElement
 
   private readonly polygons = new Map<string, SVGPolygonElement>()
+  private readonly placements = new Map<string, HexPlacement>()
   private readonly coordinates: Coordinate[]
   private readonly world: MapFrame
   private readonly viewListeners: Array<(view: MapView) => void> = []
@@ -141,8 +139,10 @@ export class MapGrid implements MapViewport {
       width: bounds.width + WORLD_VIEW_PADDING * 2,
       height: bounds.height + WORLD_VIEW_PADDING * 2,
     }
+
     this.centerX = this.world.x + this.world.width / 2
     this.centerY = this.world.y + this.world.height / 2
+
     this.view = {
       ...frameOf(this.world),
       zoomLevel: 1,
@@ -158,6 +158,7 @@ export class MapGrid implements MapViewport {
 
     for (const hexagon of hexagons) {
       const key = coordinateKey(hexagon.coordinate)
+
       const polygon = appendSvg(canvas, 'polygon', {
         id: `hex-${key}`,
         'data-x': String(hexagon.coordinate.x),
@@ -171,10 +172,17 @@ export class MapGrid implements MapViewport {
         'stroke-linejoin': 'round',
         'vector-effect': 'non-scaling-stroke',
       })
+
       this.polygons.set(key, polygon)
+
+      this.placements.set(key, {
+        x: hexagon.center.x - HEX_BOUNDS.width / 2,
+        y: hexagon.center.y - HEX_BOUNDS.height / 2,
+      })
     }
 
     this.element = canvas
+
     new ResizeObserver(() => {
       this.applyView()
     }).observe(canvas)
@@ -209,6 +217,7 @@ export class MapGrid implements MapViewport {
 
   setHexFill(coordinate: Coordinate, fill: string): void {
     const polygon = this.polygons.get(coordinateKey(coordinate))
+
     if (!polygon) {
       throw new Error(
         `No hexagon is rendered at coordinate (${coordinate.x}, ${coordinate.y}).`,
@@ -218,18 +227,41 @@ export class MapGrid implements MapViewport {
     polygon.setAttribute('fill', fill)
   }
 
+  setHexGraphic(coordinate: Coordinate, graphic: SVGSVGElement): void {
+    const key = coordinateKey(coordinate)
+    const polygon = this.polygons.get(key)
+    const placement = this.placements.get(key)
+
+    if (!polygon || !placement) {
+      throw new Error(
+        `No hexagon is rendered at coordinate (${coordinate.x}, ${coordinate.y}).`,
+      )
+    }
+
+    graphic.setAttribute('x', String(placement.x))
+    graphic.setAttribute('y', String(placement.y))
+    graphic.setAttribute('width', String(HEX_BOUNDS.width))
+    graphic.setAttribute('height', String(HEX_BOUNDS.height))
+    graphic.setAttribute('data-hex-graphic', key)
+
+    polygon.after(graphic)
+  }
+
   private applyView(): void {
     const viewport = this.element.getBoundingClientRect()
+
     this.viewportWidth = viewport.width
     this.viewportHeight = viewport.height
 
     const fitted = this.fittedViewSize()
+
     const center = this.clampCenter(
       this.centerX,
       this.centerY,
       fitted.width,
       fitted.height,
     )
+
     this.centerX = center.x
     this.centerY = center.y
 
@@ -240,9 +272,11 @@ export class MapGrid implements MapViewport {
       height: fitted.height,
       zoomLevel: this.zoomLevel,
     }
+
     this.element.setAttribute('viewBox', this.viewBoxOf(this.view))
 
     const view = this.getView()
+
     for (const listener of this.viewListeners) {
       listener(view)
     }
@@ -256,10 +290,14 @@ export class MapGrid implements MapViewport {
    */
   private fittedViewSize(): { width: number; height: number } {
     if (this.viewportWidth <= 0 || this.viewportHeight <= 0) {
-      return { width: this.world.width, height: this.world.height }
+      return {
+        width: this.world.width,
+        height: this.world.height,
+      }
     }
 
     const scale = zoomScales(this.fitScale())[this.zoomLevel - 1]
+
     return {
       width: this.viewportWidth / scale,
       height: this.viewportHeight / scale,

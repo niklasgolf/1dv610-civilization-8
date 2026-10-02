@@ -1,4 +1,4 @@
-import { appendSvg, createSvg } from './svg.ts'
+import { appendSvg, createSvg } from '../graphics/primitives/svg.ts'
 
 const POINTY_HEX = 'M12 2.2 20.4 7.1 20.4 16.9 12 21.8 3.6 16.9 3.6 7.1Z'
 
