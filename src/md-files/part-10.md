@@ -1,0 +1,1156 @@
+## **Part X — `icons.ts`: Building an SVG Icon Library in TypeScript**
+
+We have already encountered SVG in two very different places.
+
+🌊 In `ocean.ts`, SVG represents **terrain inside the game world**.
+
+🧭 In `minimap.ts`, SVG represents **the world and its viewport**.
+
+Now we meet a third use:
+
+🎨 **SVG as user-interface icons.**
+
+The file `icons.ts` is large because it contains the drawings for the many icons used by our World Builder tools.
+
+But the underlying architecture is surprisingly simple.
+
+The central idea is:
+
+> Every icon gets the same small SVG canvas, and a drawing function fills that canvas with the appropriate shapes.
+
+---
+
+# **🎨 Chapter 125 — Why Build the Icons as SVG?**
+
+Our toolbar contains many graphical concepts:
+
+terrain,
+
+features,
+
+rivers,
+
+brushes,
+
+resources,
+
+improvements,
+
+wonders,
+
+continents,
+
+and more.
+
+Instead of using bitmap files such as PNGs, the application constructs the icons as SVG.
+
+This gives us several advantages.
+
+SVG remains sharp when scaled.
+
+SVG can be styled precisely.
+
+SVG elements are normal DOM objects.
+
+And most importantly for our architecture, the icons can be generated directly from TypeScript just like our terrain graphics.
+
+But we should keep one distinction clear:
+
+### **🔘 `icons.ts`**
+
+Draws **interface icons**.
+
+### **🌊 `ocean.ts`**
+
+Draws **world graphics**.
+
+Both use SVG, but they solve different problems.
+
+---
+
+# **📐 Chapter 126 — The 24 × 24 Coordinate System**
+
+The icon system uses a standard:
+
+**24 × 24**
+
+SVG coordinate space.
+
+This is a very common way to design icons.
+
+The important point is that:
+
+**24 × 24 describes the icon's internal drawing coordinates.**
+
+It does not necessarily mean the icon must physically occupy exactly 24 screen pixels.
+
+This should sound familiar by now.
+
+It is another use of:
+
+`viewBox`.
+
+---
+
+# **🧠 126.1 The Same `viewBox` Idea at Yet Another Scale**
+
+We have now seen:
+
+🌍 a huge world-coordinate `viewBox`
+
+⬡ a roughly 260 × 300 terrain-tile `viewBox`
+
+🎨 a 24 × 24 icon `viewBox`.
+
+The concept is identical in every case.
+
+A `viewBox` establishes:
+
+**the coordinate system in which we draw.**
+
+The browser can then display that drawing at an appropriate physical size.
+
+---
+
+# **✏️ 126.2 Why 24 × 24 Is Convenient**
+
+Imagine designing an icon without a common coordinate system.
+
+One icon might use coordinates up to 1000\.
+
+Another up to 50\.
+
+Another up to 300\.
+
+It would become unnecessarily difficult to reason about their proportions.
+
+Instead, every icon artist can think:
+
+**left \= 0**
+
+**right \= 24**
+
+**top \= 0**
+
+**bottom \= 24**
+
+and:
+
+**center ≈ 12,12**
+
+That gives all our icon-drawing functions a shared visual language.
+
+---
+
+# **🧰 Chapter 127 — Small Helpers Instead of Repeating SVG Mechanics**
+
+A large icon library could become extremely repetitive.
+
+Again and again we might need to create:
+
+paths,
+
+lines,
+
+circles,
+
+polygons,
+
+hexagons,
+
+trees,
+
+and common stroke settings.
+
+So `icons.ts` contains helper functions for recurring graphical operations.
+
+Among them are helpers such as:
+
+`stroke()`
+
+`hex()`
+
+and:
+
+`tree()`.
+
+This follows the same principle we saw with:
+
+`addWave()`
+
+in our water graphics.
+
+If a small graphical operation appears repeatedly, it can be given a meaningful function.
+
+---
+
+# **✏️ Chapter 128 — `stroke()`: A Shared Line-Drawing Language**
+
+Many toolbar icons are primarily line drawings.
+
+For these, we repeatedly need properties such as:
+
+no interior fill,
+
+a stroke colour,
+
+a particular stroke width,
+
+rounded line endings,
+
+and rounded joins.
+
+Rather than repeatedly specifying the same collection of attributes, a helper can establish that shared visual style.
+
+Conceptually:
+
+`stroke(...)`
+
+means:
+
+> **“Create this shape using our normal icon line style.”**
+
+This gives the icons greater visual consistency.
+
+---
+
+# **🔗 128.1 `stroke-linecap`**
+
+We encountered this earlier in Ocean.
+
+If a line ends abruptly with a square edge, small icons can look harsh.
+
+A rounded line cap gives line endings a softer appearance.
+
+At the tiny scale of a toolbar icon, details like this matter.
+
+---
+
+# **🔗 128.2 `stroke-linejoin`**
+
+Where two line segments meet, SVG needs to decide what the corner should look like.
+
+Rounded joins can make angular icon geometry look cleaner and more coherent with rounded line caps.
+
+So our shared stroke helper is not merely saving typing.
+
+It establishes part of the **visual language of the interface**.
+
+---
+
+# **⬡ Chapter 129 — `hex()`: Reusing a Familiar Shape**
+
+Unsurprisingly, a Civilization World Builder needs many hexagonal symbols.
+
+A helper called:
+
+`hex()`
+
+allows icon-drawing functions to reuse a standard small hex form rather than repeatedly reconstructing the same geometry.
+
+This is different from our world hex geometry.
+
+The toolbar's tiny 24 × 24 icon hex is an interface symbol.
+
+It is not the authoritative 260-world-unit map hex generated by `midgard-hex-grid`.
+
+That distinction matters.
+
+---
+
+# **🗺️ 129.1 Two Kinds of Hexagon in the Application**
+
+### **⬡ World hex**
+
+Generated from `midgard-hex-grid`.
+
+Has real world geometry.
+
+Participates in the actual map.
+
+Corresponds to database coordinates.
+
+### **🔘 Icon hex**
+
+A small SVG symbol.
+
+Lives inside a 24 × 24 interface icon.
+
+Does not represent an actual database record.
+
+It merely communicates something visually to the user.
+
+They may look similar, but their responsibilities are entirely different.
+
+---
+
+# **🌳 Chapter 130 — `tree()`: Building a Reusable Visual Motif**
+
+The file also contains a tree helper.
+
+This is useful because several concepts in a Civilization-style editor may need vegetation-related imagery.
+
+Instead of independently designing every little tree from scratch, a drawing helper can provide a shared motif.
+
+This is an example of abstraction that makes sense because the helper represents a clear graphical primitive:
+
+🌳 **draw a small tree**
+
+That is easier to understand than a huge generic function trying to parameterize every conceivable icon.
+
+---
+
+# **🧩 Chapter 131 — Drawing Functions**
+
+The heart of `icons.ts` consists of many small functions that know how to draw particular icons.
+
+We can think of each one as receiving an SVG canvas and adding the shapes required for its icon.
+
+One drawing function might add:
+
+lines.
+
+Another:
+
+circles.
+
+Another:
+
+paths.
+
+Another might combine:
+
+a hex,
+
+a tree,
+
+and some additional marks.
+
+So instead of storing an icon as a static image file, we store its **drawing instructions** as TypeScript functions.
+
+---
+
+# **🧠 131.1 The Function Does Not Need to Create the Whole SVG**
+
+This separation is useful.
+
+The common icon system can create:
+
+the outer SVG,
+
+the common `viewBox`,
+
+accessibility-related attributes,
+
+and other shared setup.
+
+Then the individual drawing function only needs to answer:
+
+> **“What shapes belong inside this icon?”**
+
+That keeps each drawing function focused.
+
+---
+
+# **🗂️ Chapter 132 — `drawers`: The Icon Catalogue**
+
+One of the most important structures in the file is:
+
+`drawers`.
+
+This object maps icon names to their corresponding drawing functions.
+
+Conceptually it behaves like:
+
+**grass** → function that draws Grass icon
+
+**forest** → function that draws Forest icon
+
+**river** → function that draws River icon
+
+**brush** → function that draws Brush icon
+
+and so on.
+
+The exact catalogue is much larger, but the pattern is what matters.
+
+---
+
+# **🔑 132.1 An Object Can Be Used as a Lookup Table**
+
+Suppose another component says:
+
+**“I need the icon named `grass`.”**
+
+Rather than writing a giant chain such as:
+
+`if grass ...`
+
+`else if forest ...`
+
+`else if river ...`
+
+we can use the icon name as a key.
+
+Conceptually:
+
+`drawers[name]`
+
+gives us the correct drawing function.
+
+This is a very useful JavaScript/TypeScript pattern.
+
+---
+
+# **🧠 Chapter 133 — `typeof drawers`**
+
+Now we reach an especially nice piece of TypeScript.
+
+The file defines `IconName` using:
+
+`keyof typeof drawers`.
+
+Let's unpack this from the inside outward.
+
+First:
+
+`typeof drawers`
+
+means:
+
+> **“TypeScript, determine the type of this actual `drawers` object.”**
+
+This is not the normal runtime use of JavaScript `typeof` asking whether something is `"string"` or `"number"`.
+
+Inside a TypeScript type expression, `typeof` can capture the type of an existing value.
+
+---
+
+# **🔑 Chapter 134 — `keyof`**
+
+Then we apply:
+
+`keyof`.
+
+Suppose, for simplicity, an object contained:
+
+`grass`
+
+`forest`
+
+`river`.
+
+Then:
+
+`keyof` that object type
+
+would effectively produce the union:
+
+`'grass' | 'forest' | 'river'`
+
+So:
+
+`keyof typeof drawers`
+
+means:
+
+> **“Create a type consisting of all the valid keys that actually exist in the `drawers` object.”**
+
+That becomes:
+
+`IconName`.
+
+---
+
+# **✨ 134.1 Why This Is So Elegant**
+
+Imagine maintaining two completely separate lists.
+
+One list says:
+
+**these are the icons that exist.**
+
+Another TypeScript type says:
+
+**these are the legal icon names.**
+
+Eventually someone adds a new icon to one list but forgets to update the other.
+
+Now they disagree.
+
+With:
+
+`keyof typeof drawers`
+
+the actual catalogue itself becomes the source from which TypeScript derives the legal names.
+
+So if we add a new key to `drawers`, the `IconName` type automatically grows to include it.
+
+This reduces duplication.
+
+---
+
+# **🧬 134.2 This Is Type Derivation**
+
+This is a powerful TypeScript idea.
+
+Instead of manually writing a type first and then hoping our data agrees with it, we can sometimes derive a type from data or structures that already exist in the program.
+
+Conceptually:
+
+**actual icon catalogue**
+
+↓
+
+`typeof`
+
+↓
+
+**type of catalogue**
+
+↓
+
+`keyof`
+
+↓
+
+**legal icon names**
+
+This keeps related parts of the code synchronized.
+
+---
+
+# **🔒 Chapter 135 — Why `IconName` Is Better Than `string`**
+
+Suppose `ToolItem` simply said:
+
+`icon: string`
+
+Then this would be acceptable to TypeScript:
+
+`icon: 'potato-dragon-9000'`
+
+even if no such icon existed.
+
+Eventually `createIcon()` would try to look it up and fail.
+
+But if the property expects:
+
+`IconName`
+
+TypeScript can catch an invalid name during development.
+
+That is one of TypeScript's main benefits:
+
+> Move mistakes from runtime toward development time.
+
+---
+
+# **🔘 Chapter 136 — From `catalog.ts` to `icons.ts`**
+
+Now we can connect two files we studied earlier.
+
+`catalog.ts` describes tools.
+
+A tool can specify an icon name.
+
+`ToolButton` receives that configuration.
+
+Then it calls the icon system to construct the corresponding SVG.
+
+So the path is conceptually:
+
+📚 `catalog.ts`
+
+**“This tool uses this icon.”**
+
+↓
+
+🔘 `ToolButton`
+
+**“Please create that icon.”**
+
+↓
+
+🎨 `createIcon(name)`
+
+↓
+
+🗂️ `drawers[name]`
+
+↓
+
+✏️ appropriate drawing function
+
+↓
+
+🖼️ SVG icon
+
+↓
+
+🔘 button.
+
+This is another clean data-driven architecture.
+
+---
+
+# **🎨 Chapter 137 — `createIcon()`: The Public Door Into the Icon System**
+
+At the bottom of the architecture is the function the rest of the UI actually needs:
+
+`createIcon()`.
+
+Its caller does not need to know:
+
+which paths make a Mountain,
+
+how many circles are used,
+
+whether a Tree helper is involved,
+
+or:
+
+which coordinates a particular line uses.
+
+The caller simply provides an:
+
+`IconName`.
+
+The icon system handles the construction.
+
+---
+
+# **🧱 137.1 Create the Outer SVG**
+
+`createIcon()` creates the common SVG container.
+
+This is where the standard:
+
+**24 × 24 viewBox**
+
+comes into play.
+
+Every drawer therefore receives a consistent drawing environment.
+
+---
+
+# **✏️ 137.2 Find the Drawing Function**
+
+Using the supplied name, the function finds the corresponding function in:
+
+`drawers`.
+
+Conceptually:
+
+`drawers[name]`
+
+If:
+
+`name = some terrain icon`
+
+we get that terrain's drawer.
+
+If:
+
+`name = some resource icon`
+
+we get that resource's drawer.
+
+The lookup table removes the need for a large conditional structure.
+
+---
+
+# **🎨 137.3 Draw Into the SVG**
+
+The selected drawer then adds its shapes to the SVG.
+
+At this point, the generic empty 24 × 24 canvas becomes a specific icon.
+
+The same factory process can therefore create many visually different results.
+
+---
+
+# **📤 137.4 Return the SVG**
+
+Finally, the completed SVG element is returned.
+
+`ToolButton` can append it to its HTML button.
+
+So once again we see our familiar pattern:
+
+**factory function**
+
+↓
+
+**creates DOM/SVG object**
+
+↓
+
+**returns it**
+
+↓
+
+**another component places it.**
+
+This is conceptually similar to `createOcean()`, even though the scale and purpose are different.
+
+---
+
+# **🌳 Chapter 138 — The DOM Tree of a Tool Button**
+
+We can now understand a tool button more deeply.
+
+Conceptually, it becomes:
+
+**HTML button**
+
+↳ **SVG icon**
+
+ ↳ paths / lines / circles / polygons...
+
+↳ **HTML label**
+
+So SVG does not replace HTML.
+
+SVG is embedded inside the HTML interface where vector graphics are useful.
+
+This is a very common web-development technique.
+
+---
+
+# **🎨 Chapter 139 — SVG Is Not Just for Illustrations**
+
+At the beginning of this project, it would be easy to think:
+
+> SVG is what we use for the map.
+
+But our code demonstrates a much broader truth.
+
+SVG can serve:
+
+🌊 terrain artwork
+
+🧭 minimaps
+
+⬡ map polygons
+
+🔘 toolbar icons
+
+📍 viewport indicators
+
+and many other graphical purposes.
+
+The same underlying technology scales from tiny interface symbols to a complete world map.
+
+---
+
+# **🗄️ Chapter 140 — Does `icons.ts` Know Anything About IndexedDB?**
+
+Again:
+
+**No.**
+
+And this is exactly what we want.
+
+Suppose the Grass tool button displays a Grass icon.
+
+That does **not** mean a Grass record has been written to IndexedDB.
+
+The icon merely communicates:
+
+**“This interface control represents Grass.”**
+
+The database operation would happen later when the user actually applies that tool to a world hex.
+
+---
+
+# **⚠️ 140.1 Selected Tool Is Not Stored Terrain**
+
+This distinction will become extremely important when we implement painting.
+
+Imagine the user clicks:
+
+🌱 **Grass**
+
+in the toolbar.
+
+At that moment:
+
+🔘 UI state:
+
+**Grass tool selected**
+
+But no world hex has necessarily changed.
+
+Then the user clicks a hex.
+
+Only then might we perform:
+
+🗄️ database update:
+
+`terrain = grass`
+
+for that coordinate.
+
+So:
+
+**selecting an icon**
+
+and:
+
+**changing world data**
+
+are separate events.
+
+---
+
+# **🧠 Chapter 141 — UI Meaning Versus World Meaning**
+
+Consider a small tree icon.
+
+In the interface, it might mean:
+
+**“Choose the Woods tool.”**
+
+That SVG tree itself is not a forest feature in the world.
+
+It is a symbol communicating an action.
+
+This gives us another useful distinction.
+
+### **🔘 UI representation**
+
+Tells the user what a tool does.
+
+### **🗄️ World state**
+
+Tells the application what actually exists on a hex.
+
+### **🎨 World representation**
+
+Shows that state on the map.
+
+Eventually one action may connect all three:
+
+🔘 user selects Woods tool
+
+↓
+
+🖱️ user clicks hex
+
+↓
+
+🗄️ database says feature \= Woods
+
+↓
+
+🎨 map draws Woods artwork.
+
+But they remain separate layers.
+
+---
+
+# **🧩 Chapter 142 — Why `icons.ts` Is Large but Not Necessarily Complicated**
+
+A file with around five hundred lines can initially look intimidating.
+
+But line count and conceptual complexity are not the same thing.
+
+Much of `icons.ts` consists of many individual graphical definitions.
+
+Once we understand:
+
+📐 24 × 24 coordinate space
+
+🧰 shared drawing helpers
+
+✏️ individual drawer functions
+
+🗂️ `drawers` lookup object
+
+🧬 `IconName = keyof typeof drawers`
+
+🎨 `createIcon()`
+
+we understand the architecture of the whole file.
+
+The remaining code is largely the artistic detail of individual icons.
+
+---
+
+# **🏗️ Chapter 143 — Repetition Can Be Appropriate in Drawing Code**
+
+This relates to what we discussed with Ocean and Coast.
+
+Graphical code often contains many explicit coordinates.
+
+Trying to abstract every line and every path into a generic system can make artwork harder to understand rather than easier.
+
+A drawing function that clearly says:
+
+**put this line here**
+
+**put this circle there**
+
+**add this path**
+
+can be perfectly good code.
+
+Abstraction is valuable when it captures a meaningful recurring idea.
+
+That is why helpers such as:
+
+`stroke()`
+
+`hex()`
+
+and:
+
+`tree()`
+
+make sense.
+
+They represent recognizable recurring graphical concepts.
+
+---
+
+# **🧠 Chapter 144 — Data-Driven UI**
+
+The combination of:
+
+`catalog.ts`
+
+and:
+
+`icons.ts`
+
+also demonstrates something broader.
+
+The UI is increasingly **data-driven**.
+
+Rather than manually constructing every button separately, we can describe a tool in configuration:
+
+name,
+
+label,
+
+icon,
+
+group,
+
+selection behaviour.
+
+Then reusable components turn that description into actual DOM elements.
+
+This gives us:
+
+📚 configuration
+
+↓
+
+🧱 reusable component
+
+↓
+
+🎨 icon factory
+
+↓
+
+🔘 finished interface control.
+
+That makes adding tools much easier than hand-coding an entirely new HTML structure for each one.
+
+---
+
+# **🧬 Chapter 145 — An Especially Good TypeScript Chain**
+
+One of the nicest type relationships in this part of the application is:
+
+🗂️ actual `drawers` object
+
+↓
+
+`typeof drawers`
+
+↓
+
+type describing that object
+
+↓
+
+`keyof`
+
+↓
+
+`IconName`
+
+↓
+
+used by tool configuration
+
+↓
+
+invalid icon names can be rejected by TypeScript.
+
+This is an excellent example of TypeScript doing more than simply adding annotations to JavaScript.
+
+It lets the structure of our program generate useful compile-time constraints.
+
+---
+
+# **⭐ 146\. What to Remember From `icons.ts`**
+
+### **🎨 Every icon uses a common 24 × 24 SVG coordinate system**
+
+The physical screen size can still vary.
+
+### **🧰 Helpers capture recurring graphical ideas**
+
+Functions such as `stroke()`, `hex()` and `tree()` reduce meaningful repetition.
+
+### **✏️ Individual drawer functions create specific icons**
+
+They add SVG primitives to the common canvas.
+
+### **🗂️ `drawers` maps names to drawing functions**
+
+This acts as the central icon catalogue.
+
+### **🧬 `typeof drawers` obtains the type of that catalogue**
+
+### **🔑 `keyof typeof drawers` derives all valid icon names**
+
+This becomes `IconName`.
+
+### **🔒 `IconName` is safer than arbitrary `string`**
+
+TypeScript can detect references to icons that do not exist.
+
+### **🎨 `createIcon()` is the public factory**
+
+The rest of the UI can request an icon without knowing how it is drawn.
+
+### **🗄️ Icons are not persistent world data**
+
+A Grass icon means **“Grass tool”** in the interface; it does not by itself change a database record.
+
+---
+
+# **🌟 147\. The Three Roles of SVG in Civilization 8**
+
+We can now clearly identify three major SVG roles in the current application.
+
+### **🔘 Interface SVG**
+
+Examples:
+
+toolbar icons.
+
+Purpose:
+
+**communicate actions and categories.**
+
+---
+
+### **🗺️ Structural SVG**
+
+Examples:
+
+MapGrid polygons,
+
+minimap,
+
+viewport rectangle.
+
+Purpose:
+
+**represent geometry and navigation.**
+
+---
+
+### **🎨 World-art SVG**
+
+Examples:
+
+Ocean,
+
+Coast.
+
+Purpose:
+
+**visually represent semantic world state.**
+
+All three use the same browser SVG technology.
+
+But they belong to different architectural responsibilities.
+
+Understanding that distinction is more important than memorizing individual path coordinates.
+
+---
+
+# **📚 148\. We Have Now Covered Every Supplied File**
+
+At this point, the book has worked through the complete current source set file by file:
+
+🧱 `index.html`
+
+⚙️ `main.ts`
+
+🏗️ `world-builder.ts`
+
+🧩 `editor-layout.ts`
+
+🎨 `style.css`
+
+📋 `types.ts`
+
+📚 `catalog.ts`
+
+🔘 `tool-button.ts`
+
+🧰 `tool-section.ts`
+
+🗂️ `tool-panel.ts`
+
+🎨 `icons.ts`
+
+🗄️ `world-database.ts`
+
+🗺️ `map-area.ts`
+
+⬡ `map-grid.ts`
+
+🧭 `minimap.ts`
+
+📐 `graphics/definitions/hex.ts`
+
+🧰 `graphics/primitives/svg.ts`
+
+🌊 `graphics/terrain/ocean.ts`
+
+🏝️ `graphics/terrain/coast.ts`
+
+We have also connected them rather than treating them as isolated pieces.
+
+The result is an architecture that can now be understood as one continuous system:
+
+**browser**
+
+→ **TypeScript application**
+
+→ **UI**
+
+→ **hex geometry**
+
+→ **IndexedDB world state**
+
+→ **rendering decision**
+
+→ **SVG graphics**
+
+→ **map navigation**
+
+→ **visible World Builder**.
+
+The next natural part of the book is no longer another file chapter. It is a final **big-picture chapter** that follows one complete future editing action—selecting Grass, clicking a hex, updating IndexedDB, and rerendering it—to show how all these files are designed to cooperate when the World Builder becomes interactive.
+

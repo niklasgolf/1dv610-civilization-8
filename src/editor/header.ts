@@ -1,9 +1,18 @@
 import { appendSvg, createSvg } from '../graphics/primitives/svg.ts'
 
+export type AppView = 'world-builder' | 'project-notes'
+
+const APP_VIEWS: ReadonlyArray<readonly [AppView, string]> = [
+  ['world-builder', 'World Builder'],
+  ['project-notes', 'Project Notes'],
+]
+
 export class Header {
   readonly element: HTMLElement
 
-  constructor() {
+  private readonly buttons = new Map<AppView, HTMLButtonElement>()
+
+  constructor(onChange: (view: AppView) => void) {
     const header = document.createElement('header')
     header.className = 'editor-header'
 
@@ -24,9 +33,34 @@ export class Header {
     mode.textContent = 'World Builder'
 
     title.append(name, dash, mode)
-    header.append(createMark(), title)
 
+    const navigation = document.createElement('nav')
+    navigation.className = 'editor-header__modes'
+    navigation.setAttribute('aria-label', 'Application view')
+
+    for (const [view, label] of APP_VIEWS) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'mode-button'
+      button.textContent = label
+      button.addEventListener('click', () => {
+        onChange(view)
+      })
+      this.buttons.set(view, button)
+      navigation.append(button)
+    }
+
+    header.append(createMark(), title, navigation)
     this.element = header
+    this.setView('world-builder')
+  }
+
+  setView(view: AppView): void {
+    for (const [id, button] of this.buttons) {
+      const selected = id === view
+      button.classList.toggle('is-selected', selected)
+      button.setAttribute('aria-pressed', selected ? 'true' : 'false')
+    }
   }
 }
 

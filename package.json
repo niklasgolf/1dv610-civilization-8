@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "dexie": "^4.4.6",
+    "marked": "^18.0.14",
     "midgard-hex-grid": "file:../laboration-2/midgard-hex-grid"
   }
 }
